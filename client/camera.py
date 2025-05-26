@@ -1,11 +1,10 @@
 import json
 import struct
-
 import cv2
 import torch
 from ultralytics import YOLO
 import base64
-
+from .recognizer import Recognizer
 from client import Server
 
 
@@ -17,9 +16,10 @@ class Camera:
         self.shared_data = shared_data
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = YOLO('yolo11n.pt').to(self.device)
+        self.recognizer = Recognizer(dataset_path="/data/known_faces")
 
         self.places = {
-            'director_office' : {
+            'director_office': {
                 'box': {
                     'x1': 0,
                     'y1': 0,
@@ -27,7 +27,7 @@ class Camera:
                     'y2': 550,
                 }
             },
-            'agent':{
+            'agent': {
                 'box': {
                     'x1': 400,
                     'y1': 100,
@@ -50,7 +50,7 @@ class Camera:
 
         self.known_features = []
 
-    async def run(self, shared_data, server:Server):
+    async def run(self, shared_data, server: Server):
         self.shared_data = shared_data
         cap = cv2.VideoCapture(0)
         self.server = server
@@ -85,8 +85,6 @@ class Camera:
     def need_to_recheck(self):
         return self.checked_before <= 0
 
-
-
     def get_person_label(self, person):
         pass
 
@@ -95,33 +93,22 @@ class Camera:
         sx1, sy1, sx2, sy2 = special_place_box
 
         return px1 >= sx1 and py1 >= sy1 and px2 <= sx2 and py2 <= sy2
+
     async def handle_frame(self, frame):
         frame.flags.writeable = False
-        results = self.model.track(frame, classes=[0])
+        # results = self.model.track(frame, classes=[0])
+        person, similarity = self.recognizer.recognize(frame)
+
+        if similarity is None:
+            return frame
+
+        print(f"person: {person}, similarity: {similarity}")
         frame.flags.writeable = True
-
-
-
         suffix = ""
-        for box in results[0].boxes:
-            x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
-            fid = box.id
-
-            for name, info in self.places.items():
-                frame = self.brighten_zone(frame, info['box'])
-                if self.is_inside(info['box'].values(), map(int, box.xyxy[0].tolist())):
-                    suffix = f" {fid} in {name}"
-                    frame = cv2.putText(frame, suffix, (x1, y1 - 10), 2, 1, (0, 255, 0), 2 )
-
-            if self.checked_before <= 0:
-                self.checked_before = 30
-                # await self.match(frame, [x1, y1, x2, y2], fid)
-
-        frame = results[0].plot()
 
         return frame
 
-    async def match(self, frame, xis:list[int], fid):
+    async def match(self, frame, xis: list[int], fid):
         x1, y1, x2, y2 = xis
         person_crop = frame[y1:y2, x1:x2]
         retval, buffer = cv2.imencode('.jpg', person_crop)
@@ -140,40 +127,37 @@ class Camera:
         except json.decoder.JSONDecodeError:
             print("Received invalid JSON")
 
-
-
         # for box in results[0].boxes:
         #     x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
         #     person_crop = frame[y1:y2, x1:x2]
         #     cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
 
-            # img_tensor = self.transform(Image.fromarray(person_crop)).unsqueeze(0).to(self.device)
+        # img_tensor = self.transform(Image.fromarray(person_crop)).unsqueeze(0).to(self.device)
 
-            # self.get_person_label()
+        # self.get_person_label()
 
-            # with torch.no_grad():
-            #     feat = self.model_reid(img_tensor).cpu().numpy()
-            #
-            # # Match with known features
-            # matched_id = None
-            # for idx, known_feat in enumerate(self.known_features):
-            #     dist = np.linalg.norm(feat - known_feat)
-            #     if dist < 25:
-            #         matched_id = idx
-            #         break
-            #
-            # if matched_id is None:
-            #     self.known_features.append(feat)
-            #     matched_id = self.next_id
-            #     self.next_id += 1
-            #
-            # label = self.matches[f"{matched_id}"] if f"{matched_id}" in self.matches else matched_id
-            #
-            # cv2.putText(frame,
-            #             f"person : {label}",
-            #             (x1, y1 - 10),
-            #             cv2.FONT_HERSHEY_SIMPLEX,
-            #             0.6,
-            #             (0, 255, 0),
-            #             2)
-
+        # with torch.no_grad():
+        #     feat = self.model_reid(img_tensor).cpu().numpy()
+        #
+        # # Match with known features
+        # matched_id = None
+        # for idx, known_feat in enumerate(self.known_features):
+        #     dist = np.linalg.norm(feat - known_feat)
+        #     if dist < 25:
+        #         matched_id = idx
+        #         break
+        #
+        # if matched_id is None:
+        #     self.known_features.append(feat)
+        #     matched_id = self.next_id
+        #     self.next_id += 1
+        #
+        # label = self.matches[f"{matched_id}"] if f"{matched_id}" in self.matches else matched_id
+        #
+        # cv2.putText(frame,
+        #             f"person : {label}",
+        #             (x1, y1 - 10),
+        #             cv2.FONT_HERSHEY_SIMPLEX,
+        #             0.6,
+        #             (0, 255, 0),
+        #             2)

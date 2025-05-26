@@ -70,10 +70,10 @@ sympy==1.13.1
 tensorboard==2.19.0
 tensorboard-data-server==0.7.2
 termcolor==3.0.1
-torch==2.6.0+cu118
-torchaudio==2.6.0+cu118
+torch==2.6.0
+torchaudio==2.6.0
 torchreid==0.2.5
-torchvision==0.21.0+cu118
+torchvision==0.21.0
 tqdm==4.67.1
 typing_extensions==4.12.2
 tzdata==2025.2
