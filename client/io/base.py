@@ -20,6 +20,7 @@ class IOMessage:
 
     def with_binary(self, binary):
         self.binary = binary
+
     def append(self, key:str, value:any):
         if self.payload is None:
             self.payload = {}

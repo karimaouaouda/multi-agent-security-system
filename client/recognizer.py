@@ -8,6 +8,8 @@ app = FaceAnalysis(name='buffalo_l', providers=['CPUExecutionProvider'])  # Use 
 app.prepare(ctx_id=-1)  # ctx_id=-1 for CPU, 0 for GPU
 
 
+
+
 def get_face_embedding(image: str | np.ndarray):
     """Extract face embedding from an image"""
 
@@ -40,6 +42,7 @@ def compare_faces(emb1, emb2, threshold=0.65):  # Adjust this threshold accordin
     return similarity, similarity > threshold
 
 
+
 class Recognizer:
     def __init__(self, dataset_path: str):
         self.dataset: dict = {}
@@ -65,15 +68,20 @@ class Recognizer:
             embedding = get_face_embedding(picture)
         except ValueError as e:
             print('error', e)
-            return None
+            return False, False, False
 
+        best_sim = -1
+        best_sim_per = None
         for person, images in self.dataset.items():
             for image in images:
                 similarity, is_same = compare_faces(embedding, image, self.threshold)
                 if is_same:
-                    return person, similarity
+                    return person, similarity, True
+                elif similarity > best_sim:
+                    best_sim = similarity
+                    best_sim_per = person
 
-        return None, None
+        return best_sim_per, best_sim, False
 
     def setup(self):
         persons = os.listdir(self.dataset_path)
@@ -85,3 +93,9 @@ class Recognizer:
                 embedding = get_face_embedding(os.path.join(self.dataset_path, person, image))
                 self.dataset[person].append(embedding)
                 print(f"loaded {person} image")
+
+
+class FaceRecognitionResult:
+    def __init__(self, recognizer:Recognizer):
+        self.recognizer = recognizer
+        self.recognitions = []

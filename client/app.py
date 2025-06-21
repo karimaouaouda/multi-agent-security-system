@@ -1,5 +1,4 @@
 import asyncio
-from client import Server
 from client.camera import Camera
 
 """
@@ -39,8 +38,6 @@ class Application:
 
     def setup(self):
         # first we need to setup the server
-        self.server = Server()
-
         self.camera = Camera()
 
     async def run(self):

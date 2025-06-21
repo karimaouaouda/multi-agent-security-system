@@ -1,9 +1,4 @@
-import cv2
-from facenet_pytorch.models.inception_resnet_v1 import InceptionResnetV1
-import torch
-import os
-from torchvision import transforms
-from PIL import Image
+import numpy as np
 
 class Person:
     def __init__(self, name: str | None, ):
@@ -19,53 +14,26 @@ class Person:
         self.name = name
 
 
-class FaceRecognizer:
-    def __init__(self, faces_path, mrcnn=None):
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.model = InceptionResnetV1(pretrained='vggface2').eval().to(self.device)
-        self.faces_path = faces_path
-        self.detector = mrcnn
-        self.faces = {}
-        self.transform = transforms.Compose([
-            transforms.Resize((160, 160)),  # FaceNet input size
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.5], std=[0.5])
-        ])
-        self.load_faces2()
+class FrameHandler:
+    def __init__(self):
+        self.frame:np.ndarray|None = None
 
-    def recognize(self, image):
-        pass
+    def update_frame(self, frame:np.ndarray):
+        self.frame = frame
 
-    def load_faces2(self):
-        print('load data...')
-        persons_images = os.listdir(self.faces_path)
-        for image_name in persons_images:
-            image = cv2.imread(os.path.join(self.faces_path, image_name), cv2.IMREAD_COLOR_RGB)
-            faces = self.detector(image)
 
-            if faces is None:
-                return None
+    async def process_frame(self, frame) -> np.ndarray:
+        return frame
 
-            embeddings = self.model(faces.to(self.device))  # batch of embeddings
+    def brighten_zone(self, frame, box, brightness_increase=40):
+        # Extract coordinates
+        x1, y1, x2, y2 = box['x1'], box['y1'], box['x2'], box['y2']
 
-            self.faces[image_name] = embeddings
-    def load_faces(self):
-        # Detect faces
-        persons = os.listdir(self.faces_path)
+        # Ensure coordinates are within frame bounds
+        h, w = frame.shape[:2]
+        x1 = max(0, min(x1, w - 1))
+        x2 = max(0, min(x2, w))
+        y1 = max(0, min(y1, h - 1))
+        y2 = max(0, min(y2, h))
 
-        for person in persons:
-            person_images = os.listdir(os.path.join(self.faces_path, person))
-            for person_image in person_images:
-                image = cv2.imread(os.path.join(self.faces_path, person, person_image), cv2.IMREAD_COLOR_RGB)
-                image = Image.fromarray(image)
-                faces = self.detector(image)
-
-                if faces is None:
-                    return None
-
-                embeddings = self.model(faces.to(self.device))  # batch of embeddings
-
-                self.faces[person] = embeddings
-
-        print(f"finish with : {len(self.faces)} faces")
-
+        return cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 0, 0), 2)
