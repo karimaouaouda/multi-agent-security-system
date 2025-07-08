@@ -1,5 +1,8 @@
 import asyncio
 from client.camera import Camera
+from dotenv import load_dotenv
+
+load_dotenv()
 
 """
 this file is the main class of the client Core Concept

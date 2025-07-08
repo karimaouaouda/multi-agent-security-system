@@ -3,10 +3,11 @@ import cv2
 import numpy as np
 from insightface.app import FaceAnalysis
 import pickle
+import torch
 
 # Initialize face analysis model
-app = FaceAnalysis(name='buffalo_l', providers=['CPUExecutionProvider'])  # Use 'CUDAExecutionProvider' for GPU
-app.prepare(ctx_id=-1)  # ctx_id=-1 for CPU, 0 for GPU
+app = FaceAnalysis(name='buffalo_l', providers=['CUDAExecutionProvider'])  # Use 'CUDAExecutionProvider' for GPU
+app.prepare(ctx_id=0)  # ctx_id=-1 for CPU, 0 for GPU
 
 
 
@@ -24,6 +25,26 @@ def load_or_save_pickle(data_dict, filepath):
             pickle.dump(data_dict, f)
             print(f"Saving new data to {filepath}")
             return data_dict
+
+def get_faces(image: str | np.ndarray):
+    """Extract face embedding from an image"""
+
+    if isinstance(image, str):
+        # check if path exists
+        if not os.path.exists(image):
+            raise FileNotFoundError(f'{image} does not exist')
+
+        image = cv2.imread(image)
+
+    elif not isinstance(image, np.ndarray):
+        raise TypeError('image must be str or np.ndarray')
+
+    if image is None:
+        raise ValueError(f"Could not read image: {image}")
+
+    faces = app.get(image)
+
+    return faces
 
 def get_face_embedding(image: str | np.ndarray):
     """Extract face embedding from an image"""
@@ -51,7 +72,7 @@ def get_face_embedding(image: str | np.ndarray):
     return faces[0].embedding
 
 
-def compare_faces(emb1, emb2, threshold=0.65):  # Adjust this threshold according to your usecase.
+def compare_faces(emb1, emb2, threshold=0.7):  # Adjust this threshold according to your usecase.
     """Compare two embeddings using cosine similarity"""
     similarity = np.dot(emb1, emb2) / (np.linalg.norm(emb1) * np.linalg.norm(emb2))
     return similarity, similarity > threshold
@@ -78,25 +99,43 @@ class Recognizer:
 
         if picture is None:
             raise ValueError(f"Could not read image: {picture}")
+        
+        faces_results = []
 
         try:
-            embedding = get_face_embedding(picture)
+            faces = get_faces(picture)
+
+            if len(faces) < 1:
+                return []
+            
+            for face in faces:
+                faces_results.append({
+                    "name" : "unknown",
+                    "embedding": face.embedding,
+                    "box": face["bbox"],
+                    "name": "unknown",
+                    "similarity": -1,
+                    "is_same": False
+                })
         except ValueError as e:
             print('error', e)
             return False, False, False
+        
+        for face_result in faces_results:
+            best_sim = -1
+            best_sim_per = None
+            for person, images in self.dataset.items():
+                for image in images:
+                    similarity, is_same = compare_faces(face_result["embedding"], image, self.threshold)
+                    if is_same or similarity > best_sim:
+                        best_sim = similarity
+                        best_sim_per = person
+            face_result["similarity"] = best_sim
+            face_result["name"] = best_sim_per
+            face_result["is_same"] = best_sim > 0.7  # Adjust this threshold according to your usecase.
+                        
 
-        best_sim = -1
-        best_sim_per = None
-        for person, images in self.dataset.items():
-            for image in images:
-                similarity, is_same = compare_faces(embedding, image, self.threshold)
-                if is_same:
-                    return person, similarity, True
-                elif similarity > best_sim:
-                    best_sim = similarity
-                    best_sim_per = person
-
-        return best_sim_per, best_sim, False
+        return faces_results
 
     def setup(self):
         if os.path.exists('data.pkl'):
