@@ -4,3 +4,5 @@ yolo11n-pose.pt
 yolo11n.pt
 yolov8n.pt
 yolov11n-face.pt
+.venv
+.idea

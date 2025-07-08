@@ -2,6 +2,7 @@ import os
 import cv2
 import numpy as np
 from insightface.app import FaceAnalysis
+import pickle
 
 # Initialize face analysis model
 app = FaceAnalysis(name='buffalo_l', providers=['CPUExecutionProvider'])  # Use 'CUDAExecutionProvider' for GPU
@@ -9,6 +10,20 @@ app.prepare(ctx_id=-1)  # ctx_id=-1 for CPU, 0 for GPU
 
 
 
+def load_or_save_pickle(data_dict, filepath):
+    """
+    If the pickle file exists, load and return the dict.
+    Otherwise, save the provided dict and return it.
+    """
+    if os.path.exists(filepath):
+        with open(filepath, 'rb') as f:
+            print(f"Loading data from {filepath}")
+            return pickle.load(f)
+    else:
+        with open(filepath, 'wb') as f:
+            pickle.dump(data_dict, f)
+            print(f"Saving new data to {filepath}")
+            return data_dict
 
 def get_face_embedding(image: str | np.ndarray):
     """Extract face embedding from an image"""
@@ -84,6 +99,10 @@ class Recognizer:
         return best_sim_per, best_sim, False
 
     def setup(self):
+        if os.path.exists('data.pkl'):
+            self.load_faces('data.pkl')
+            return
+         
         persons = os.listdir(self.dataset_path)
         for person in persons:
             self.dataset[person] = []
@@ -93,6 +112,18 @@ class Recognizer:
                 embedding = get_face_embedding(os.path.join(self.dataset_path, person, image))
                 self.dataset[person].append(embedding)
                 print(f"loaded {person} image")
+
+        self.save_faces('data.pkl')
+    
+    def save_faces(self, filename):
+         with open(filename, 'wb') as f:
+            pickle.dump(self.dataset, f)
+            print(f"Saving new data to {filename}")
+
+    def load_faces(self, filename):
+        with open(filename, 'rb') as f:
+            print(f"Loading data from {filename}")
+            self.dataset = pickle.load(f)
 
 
 class FaceRecognitionResult:

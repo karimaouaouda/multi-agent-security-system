@@ -22,7 +22,7 @@ class FrameHandler:
         self.frame = frame
 
 
-    async def process_frame(self, frame) -> np.ndarray:
+    def process_frame(self, frame) -> np.ndarray:
         return frame
 
     def brighten_zone(self, frame, box, brightness_increase=40):

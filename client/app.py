@@ -40,6 +40,6 @@ class Application:
         # first we need to setup the server
         self.camera = Camera()
 
-    async def run(self):
+    def run(self):
         #await self.server.connect()
-        await self.camera.run(self.shared_data, self.server)
+        self.camera.run(self.shared_data, self.server)
